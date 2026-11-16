@@ -2,8 +2,10 @@
 """
 igapi.py - the one place this pack talks to Instagram.
 
-Meta's official Instagram API with Instagram Login (graph.instagram.com), for a
-professional (Business or Creator) account. Nothing else in the pack touches
+Meta's official Instagram API, for a professional (Business or Creator)
+account: graph.facebook.com with the system-user token of "API setup with
+Unified login" (what new apps get), or graph.instagram.com with the 60-day
+token of the older "Instagram login". Nothing else in the pack touches
 Instagram: no browser automation, no scraping, no password.
 
 Reads run freely: profile, media, insights, comments, publishing quota.
@@ -21,9 +23,11 @@ The client folder
 Usage
   python3 igapi.py where
   python3 igapi.py init                                  # create the client folder
-  python3 igapi.py connect --token-stdin < token.txt     # once per client
+  pbpaste | python3 igapi.py connect --token-stdin --host graph.facebook.com \
+      --user-id IG_ACCOUNT_ID --system-user              # once per client (Unified login)
+  pbpaste | python3 igapi.py connect --token-stdin       # older apps (Instagram login)
   python3 igapi.py status [--check]                      # who, token age, expiry
-  python3 igapi.py refresh                               # monthly; token must be >24h old
+  python3 igapi.py refresh                               # Instagram-login tokens only, monthly
   python3 igapi.py whoami
   python3 igapi.py media --limit 25
   python3 igapi.py insights MEDIA_ID
@@ -57,7 +61,13 @@ import urllib.parse
 import urllib.request
 
 API_VERSION = "v27.0"
-GRAPH = "https://graph.instagram.com"
+# Two hosts serve the same Instagram endpoints. graph.instagram.com takes the
+# 60-day tokens of "API setup with Instagram login"; graph.facebook.com takes
+# the system-user tokens of "API setup with Unified login", which apps created
+# since late 2026 get instead, and which never expire. The token file says which.
+INSTAGRAM_HOST = "graph.instagram.com"
+FACEBOOK_HOST = "graph.facebook.com"
+GRAPH = f"https://{INSTAGRAM_HOST}"
 TIMEOUT = 30
 UA = "ruliad-igapi/1.0 (+https://theruliad.eu)"
 
@@ -337,18 +347,32 @@ def cmd_init(args):
     emit(args, result, human)
 
 
+def use_host(host):
+    global GRAPH
+    GRAPH = f"https://{host or INSTAGRAM_HOST}"
+
+
 def cmd_connect(args):
     if not args.token_stdin:
         die("pass the token on stdin with --token-stdin; it never goes on a command line")
     token = sys.stdin.read().strip()
     if not token or any(ch.isspace() for ch in token):
         die("stdin did not hold a single token")
-    me = call("GET", "me", token, {"fields": "user_id,username,account_type"})
+    use_host(args.host)
+    if args.host == FACEBOOK_HOST:
+        if not args.user_id:
+            die("a graph.facebook.com token needs --user-id: the Instagram account id the dashboard shows")
+        me = call("GET", args.user_id, token, {"fields": "id,username,name"})
+        me = {"user_id": me.get("id"), "username": me.get("username"), "account_type": "BUSINESS"}
+    else:
+        me = call("GET", "me", token, {"fields": "user_id,username,account_type"})
     home = client_home(args.home)
     os.makedirs(home, exist_ok=True)
     when = now_utc()
     record = {
         "access_token": token,
+        "host": args.host,
+        "never_expires": bool(args.system_user),
         "user_id": me.get("user_id") or me.get("id"),
         "app_scoped_id": me.get("id"),
         "username": me.get("username"),
@@ -376,7 +400,9 @@ def token_status(rec):
     expires = parse_time(rec.get("expires_at"))
     age_days = (when - connected).total_seconds() / 86400 if connected else None
     left_days = (expires - when).total_seconds() / 86400 if expires else None
-    if left_days is not None and left_days <= 0:
+    if rec.get("never_expires"):
+        advice = "ok: a system-user token does not expire (revoke it in the app dashboard if it leaks)"
+    elif left_days is not None and left_days <= 0:
         advice = "expired: generate a new token and connect again"
     elif age_days is not None and age_days < 1:
         advice = "fresh; refresh works once it is a day old"
@@ -399,8 +425,9 @@ def cmd_status(args):
     rec = load_token(home)
     result = dict(token_status(rec), home=home)
     if args.check:
+        use_host(rec.get("host"))
         try:
-            me = call("GET", "me", rec["access_token"], {"fields": "username,account_type"})
+            me = call("GET", account_node(rec, rec.get("user_id")), rec["access_token"], {"fields": "username"})
             result["live"] = f"ok, @{me.get('username')}"
         except ApiError as err:
             result["live"] = f"FAILED: {err.message}"
@@ -408,7 +435,10 @@ def cmd_status(args):
     def human(r):
         print(f"@{r['username']}  ({r['account_type']}, user {r['user_id']})  {r['home']}")
         print(f"token age   {fmt(r['token_age_days'])} days")
-        print(f"expires     {r['expires_at'] or 'unknown'}  ({fmt(r['days_left'])} days left)")
+        if r["advice"].startswith("ok: a system-user token"):
+            print("expires     never (system-user token)")
+        else:
+            print(f"expires     {r['expires_at'] or 'unknown'}  ({fmt(r['days_left'])} days left)")
         print(f"advice      {r['advice']}")
         if "live" in r:
             print(f"live check  {r['live']}")
@@ -418,6 +448,12 @@ def cmd_status(args):
 def cmd_refresh(args):
     home = client_home(args.home)
     rec = load_token(home)
+    if rec.get("never_expires"):
+        emit(args, token_status(rec), lambda r: print("nothing to refresh: system-user tokens do not expire"))
+        return
+    if rec.get("host") == FACEBOOK_HOST:
+        die("this graph.facebook.com token is not a system-user token; generate a new one in the dashboard")
+    use_host(rec.get("host"))
     resp = call("GET", "refresh_access_token", rec["access_token"],
                 {"grant_type": "ig_refresh_token"}, versioned=False)
     if not resp.get("access_token"):
@@ -438,13 +474,24 @@ def cmd_refresh(args):
 def session(args):
     home = client_home(args.home)
     rec = load_token(home)
+    use_host(rec.get("host"))
     return home, rec, rec["access_token"], rec.get("user_id") or "me"
 
 
+def account_node(rec, ig_id):
+    """`me` is the Instagram account on graph.instagram.com; with a system-user
+    token on graph.facebook.com it is the system user, so name the account."""
+    return ig_id if rec.get("host") == FACEBOOK_HOST else "me"
+
+
 def cmd_whoami(args):
-    _, _, token, _ = session(args)
-    me = call("GET", "me", token, {"fields": "user_id,username,name,account_type,profile_picture_url,"
-                                             "followers_count,follows_count,media_count"})
+    _, rec, token, ig_id = session(args)
+    fields = "username,name,profile_picture_url,followers_count,follows_count,media_count"
+    if rec.get("host") == FACEBOOK_HOST:
+        me = call("GET", ig_id, token, {"fields": "id," + fields})
+        me.update(user_id=me.get("id"), account_type=rec.get("account_type"))
+    else:
+        me = call("GET", "me", token, {"fields": "user_id,account_type," + fields})
 
     def human(r):
         print(f"@{r.get('username')}  {r.get('name') or ''}  ({r.get('account_type')})")
@@ -462,8 +509,8 @@ def first_line(caption, width=60):
 
 
 def cmd_media(args):
-    _, _, token, _ = session(args)
-    items = paged("me/media", token, {"fields": MEDIA_FIELDS}, args.limit)
+    _, rec, token, ig_id = session(args)
+    items = paged(f"{account_node(rec, ig_id)}/media", token, {"fields": MEDIA_FIELDS}, args.limit)
 
     def human(rows):
         for m in rows:
@@ -583,8 +630,8 @@ def print_rows(rows, title):
 
 
 def cmd_audit(args):
-    home, _, token, _ = session(args)
-    media_list = paged("me/media", token, {"fields": MEDIA_FIELDS}, args.limit)
+    home, rec, token, ig_id = session(args)
+    media_list = paged(f"{account_node(rec, ig_id)}/media", token, {"fields": MEDIA_FIELDS}, args.limit)
     rows = audit_rows(token, media_list)
     median = score_posts(rows)
     ranked = sorted(rows, key=lambda r: (r["outlier"] is None, -(r["outlier"] or 0)))
@@ -922,7 +969,7 @@ def human_plan(p):
 # --- campaign report -----------------------------------------------------------
 
 def cmd_report(args):
-    home, _, token, _ = session(args)
+    home, rec, token, ig_id = session(args)
     path = os.path.join(home, "published.jsonl")
     entries = []
     if os.path.exists(path):
@@ -938,7 +985,7 @@ def cmd_report(args):
                                "caption": e.get("first_line")} for e in posts])
     baseline = None
     if args.baseline:
-        others = [m for m in paged("me/media", token, {"fields": MEDIA_FIELDS}, args.baseline)
+        others = [m for m in paged(f"{account_node(rec, ig_id)}/media", token, {"fields": MEDIA_FIELDS}, args.baseline)
                   if m["id"] not in {e["media_id"] for e in posts}]
         base_rows = audit_rows(token, others)
         views = [r["insights"].get("views") for r in base_rows if isinstance(r["insights"].get("views"), (int, float))]
@@ -984,6 +1031,10 @@ def main():
     sub.add_parser("init", help="create the client folder").set_defaults(fn=cmd_init)
     p = sub.add_parser("connect", help="store a token read from stdin")
     p.add_argument("--token-stdin", action="store_true")
+    p.add_argument("--host", choices=[INSTAGRAM_HOST, FACEBOOK_HOST], default=INSTAGRAM_HOST,
+                   help=f"{FACEBOOK_HOST} for Unified-login (system-user) tokens")
+    p.add_argument("--user-id", help="the Instagram account id (needed with --host graph.facebook.com)")
+    p.add_argument("--system-user", action="store_true", help="the token never expires (Unified login)")
     p.add_argument("--expires-in", type=int, help="seconds until expiry, if Meta told you")
     p.set_defaults(fn=cmd_connect)
     p = sub.add_parser("status", help="token age and expiry")

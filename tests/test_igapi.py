@@ -69,6 +69,7 @@ class FakeInstagram:
         self.containers = 0
         self.token_valid = True
         self.refuse_metric = "reels_skip_rate"
+        self.hosts = set()
 
     def error(self, url, code, status=400, message="bad request"):
         body = json.dumps({"error": {"message": message, "code": code}}).encode()
@@ -87,22 +88,28 @@ class FakeInstagram:
         method = req.get_method()
         path = parts.path.replace("/" + igapi.API_VERSION, "", 1)
         self.calls.append((method, path, params))
+        self.hosts.add(parts.netloc)
         if params.get("access_token") not in (TOKEN, NEW_TOKEN) or not self.token_valid:
             self.error(url, 190, 401, "Error validating access token")
-        return Resp(self.route(method, path, params, url))
+        return Resp(self.route(method, path, params, url, parts.netloc))
 
-    def route(self, method, path, params, url):
+    def route(self, method, path, params, url, host):
         if path == "/me" and method == "GET":
+            if host == igapi.FACEBOOK_HOST:
+                return {"id": "system-user-9", "name": "The Ruliad Campaigns system user"}
             return {"id": "app-scoped-1", "user_id": "1784", "username": "theruliad.eu",
                     "account_type": "BUSINESS", "name": "The Ruliad", "followers_count": 120,
                     "follows_count": 10, "media_count": 3}
+        if path == "/1784" and method == "GET":
+            return {"id": "1784", "username": "theruliad.eu", "name": "The Ruliad", "followers_count": 120,
+                    "follows_count": 10, "media_count": 3}
         if path == "/refresh_access_token":
             return {"access_token": NEW_TOKEN, "token_type": "bearer", "expires_in": 5184000}
-        if path == "/me/media":
+        if path in ("/me/media", "/1784/media") and method == "GET":
             if params.get("after") == "page2":
                 return {"data": [{"id": "m3", "media_product_type": "FEED", "media_type": "IMAGE",
                                   "timestamp": "2026-11-01T10:00:00+0000", "caption": "third"}]}
-            nxt = "https://graph.instagram.com/v27.0/me/media?" + urllib.parse.urlencode(
+            nxt = f"https://{host}/v27.0{path}?" + urllib.parse.urlencode(
                 {"access_token": params["access_token"], "after": "page2", "fields": params.get("fields", "")})
             return {"data": [{"id": "m1", "media_product_type": "REELS", "media_type": "VIDEO",
                               "timestamp": "2026-11-10T10:00:00+0000", "caption": "first reel\nmore"},
@@ -342,6 +349,30 @@ class IgapiTest(unittest.TestCase):
         code, _, err = self.run_cli("whoami")
         self.assertEqual(code, 4)
         self.assertIn("connect again", err)
+
+    def test_unified_login_system_user_token(self):
+        code, out, err = self.run_cli("connect", "--token-stdin", "--host", "graph.facebook.com",
+                                      stdin=TOKEN)
+        self.assertEqual(code, 2, "a graph.facebook.com token without --user-id must be refused")
+        self.assertIn("--user-id", err)
+        code, out, _ = self.run_cli("connect", "--token-stdin", "--host", "graph.facebook.com",
+                                    "--user-id", "1784", "--system-user", stdin=TOKEN)
+        self.assertEqual(code, 0, out)
+        self.assertIn("@theruliad.eu", out)
+        code, out, _ = self.run_cli("status")
+        self.assertIn("does not expire", out)
+        code, out, _ = self.run_cli("refresh")
+        self.assertEqual(code, 0)
+        self.assertIn("nothing to refresh", out)
+        self.assertFalse(any(c[1] == "/refresh_access_token" for c in self.fake.calls))
+        code, out, _ = self.run_cli("--json", "media", "--limit", "3")
+        self.assertEqual(code, 0, out)
+        self.assertEqual([m["id"] for m in json.loads(out)], ["m1", "m2", "m3"])
+        self.assertTrue(any(c[1] == "/1784/media" for c in self.fake.calls))
+        code, out, _ = self.run_cli("publish", "image", "--url", "https://cdn.example/feed.jpg", "--confirm")
+        self.assertEqual(code, 0, out)
+        self.assertTrue(any(c[0] == "POST" and c[1] == "/1784/media_publish" for c in self.fake.calls))
+        self.assertEqual(self.fake.hosts, {"graph.facebook.com"}, "every call must go to the token's host")
 
     def test_jpeg_size_reader(self):
         self.assertEqual(igapi.jpeg_size(jpeg(1080, 1350)), (1080, 1350))

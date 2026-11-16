@@ -44,22 +44,35 @@ on.
 ## Connecting an account, once per client
 
 The account must be professional (Business or Creator). The app is The
-Ruliad's Meta app, with the "Instagram API with Instagram login" product.
+Ruliad's Meta app "The Ruliad Campaigns" (app 1170679578806876, owned by the
+business portfolio The Ruliad BV) with the "Manage messaging & content on
+Instagram" use case. Apps created since late 2026 get "API setup with Unified
+login": its login configuration, "Instagram API (unified login)", carries
+`instagram_basic`, `instagram_content_publish`, `instagram_manage_comments`,
+`instagram_manage_insights`, `instagram_manage_messages`, `ads_read` and
+`ads_management`.
 
-1. App Dashboard → Instagram → API setup with Instagram login → Roles: add the
-   client's handle as an **Instagram tester**. The client accepts it in
-   Instagram under Settings → Website permissions → Apps and websites → Tester
-   invites. Standard Access covers accounts we manage and have added to the
-   app; anything else needs App Review for Advanced Access.
-2. "Generate access token" for that account. The token carries the scopes
-   `instagram_business_basic`, `instagram_business_content_publish`,
-   `instagram_business_manage_insights` and `instagram_business_manage_comments`.
-3. Give the token to igapi.py on stdin, never on a command line and never in
-   a chat message: `pbpaste | python3 igapi.py connect --token-stdin`.
-4. `python3 igapi.py whoami` must print the client's handle.
+1. App Dashboard → App roles → Roles → Add people → **Instagram Tester** →
+   the client's handle. The client accepts it in Instagram under Settings →
+   Apps and websites → Tester invites. Instagram may first show its EU
+   ad-data choice; that choice belongs to the account owner. Standard Access
+   covers accounts we manage and have added to the app; anything else needs
+   App Review for Advanced Access.
+2. Use cases → Instagram API → Customize → API setup with Unified login →
+   step 2 → "Generate token" next to the handle. The owner approves in the
+   window Meta opens. In the "Token generated" box, tick "I understand" and
+   click **Copy**: the box shows the token once.
+3. From the project root, hand it to igapi.py from the clipboard, never on a
+   command line and never in a chat message (the browser extension refuses to
+   read tokens anyway), then clear the clipboard:
+   `pbpaste | python3 igapi.py connect --token-stdin --host graph.facebook.com --user-id <the account id the dashboard shows> --system-user`
+4. `python3 igapi.py status --check` must print the client's handle.
 
-Tokens last 60 days. `igapi.py status` says how long is left and
-`igapi.py refresh` renews one that is at least a day old. Refresh monthly.
+A Unified-login token is a system-user token and never expires, so there is
+nothing to refresh. If one leaks, remove the app under the account's
+Instagram → Apps and websites, then generate a new one. Older apps on
+"Instagram login" get 60-day tokens on graph.instagram.com: connect without
+`--host`, and run `igapi.py refresh` monthly.
 
 Never ask for, store or type an Instagram or Facebook password. A step that
 needs a login is the user's or the client's.

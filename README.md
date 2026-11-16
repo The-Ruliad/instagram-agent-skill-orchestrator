@@ -8,9 +8,10 @@
 > - **`/ig-campaign`**, the orchestrator: brief, baseline, plan, the ig-* skills
 >   for the words, Higgsfield for images and video, the humanizer, a review
 >   sheet, then posting and live insights. Its `igapi.py` is the only code
->   that talks to Instagram, through Meta's official Instagram API with
->   Instagram Login: a dry run by default, `--confirm` to post, and in TR_OS
->   a deploy-class gate on every confirmed post.
+>   that talks to Instagram, through Meta's official Instagram API (Unified
+>   login system-user tokens on graph.facebook.com, or Instagram-login tokens
+>   on graph.instagram.com): a dry run by default, `--confirm` to post, and
+>   in TR_OS a deploy-class gate on every confirmed post.
 > - **`/seo-geo`**: what search engines and AI answer engines can read about a
 >   client's website, scored, with the search terms that feed the captions.
 > - **One folder per client**: `marketing/instagram/` at the root of the
@@ -300,9 +301,9 @@ block, and you post it. That is not a limitation bolted on afterwards, it is
 the design, and it is why the approval gate is real rather than a setting.
 
 **In this fork, one skill does post, through that API and nothing else.**
-`/ig-campaign` uses the Instagram API with Instagram Login, which since 2024 no
-longer needs a linked Facebook Page, and needs no app review for accounts you
-manage and have added to your own app. A post goes out only as a separate
+`/ig-campaign` uses Meta's Instagram API, which no longer needs a linked
+Facebook Page, and needs no app review for accounts you manage and have added
+to your own app as Instagram testers. A post goes out only as a separate
 `igapi.py publish ... --confirm` command after the user has seen the dry run
 and said yes, and under TR_OS that command waits on the operator's approval
 like a production deploy. Everything above still holds for the other twelve

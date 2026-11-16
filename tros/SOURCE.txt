@@ -8,8 +8,10 @@ staged:         by tros/install.sh from a checkout of the fork; every file is ch
 modifications:  The Ruliad, 2026-11-16. One folder per client (marketing/instagram/ at the
                 project root) instead of ~/.claude/instagram/. Posting hand-offs to /ig-campaign
                 in ig-reel, ig-carousel, ig-story, ig-caption and ig-plan; live API numbers in
-                ig-audit and ig-reply. New skills: ig-campaign (igapi.py: Instagram API with
-                Instagram Login, publish only with --confirm) and seo-geo (seogeo.py).
+                ig-audit and ig-reply. New skills: ig-campaign (igapi.py: Meta's Instagram API,
+                Unified-login or Instagram-login tokens, publish only with --confirm) and seo-geo
+                (seogeo.py). Verified live 2026-11-16 against @theruliad.eu: profile, quota,
+                insights, and an unpublished container with alt text and the AI label.
 review:         2026-11-16. Upstream: regex sweep of every file plus a read of all six Python
                 tools (stdlib only; no network, no subprocess, no eval; they write only to an
                 --out path the user names) and the SKILL.md files (no instruction overrides;
@@ -17,7 +19,7 @@ review:         2026-11-16. Upstream: regex sweep of every file plus a read of a
                 logs in, and may suggest yt-dlp for YouTube Shorts, which would be a new
                 dependency). Fork code: igapi.py talks only to graph.instagram.com and to the
                 media URLs it is given; the token is read from stdin, stored mode 600 in a
-                self-ignoring .secrets/ and never printed; 16 offline tests. seogeo.py makes
+                self-ignoring .secrets/ and never printed; 17 offline tests. seogeo.py makes
                 four or five GET requests to the site it is given.
 gate:           `igapi.py ... publish ... --confirm` is deploy-class in TR_OS (operator policy
                 entry "instagram_publish", added by tros/install.sh).
