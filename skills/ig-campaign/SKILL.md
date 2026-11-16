@@ -62,10 +62,13 @@ login": its login configuration, "Instagram API (unified login)", carries
    step 2 → "Generate token" next to the handle. The owner approves in the
    window Meta opens. In the "Token generated" box, tick "I understand" and
    click **Copy**: the box shows the token once.
-3. From the project root, hand it to igapi.py from the clipboard, never on a
-   command line and never in a chat message (the browser extension refuses to
-   read tokens anyway), then clear the clipboard:
-   `pbpaste | python3 igapi.py connect --token-stdin --host graph.facebook.com --user-id <the account id the dashboard shows> --system-user`
+3. The user runs `! bash <this skill's folder>/connect.sh <account id>` from
+   the client's project, with the id the dashboard shows under the handle. It
+   hands the token from the clipboard to igapi.py, never through a command
+   line or a chat message (the browser extension refuses to read tokens
+   anyway), clears the clipboard, logs the outcome to `connect.log` in the
+   client folder, and prints the account it reached. A session cannot run it:
+   the sandbox cannot read the clipboard.
 4. `python3 igapi.py status --check` must print the client's handle.
 
 A Unified-login token is a system-user token and never expires, so there is
