@@ -94,4 +94,6 @@ STORIES  ·  Tuesday  ·  5 frames
 After: everyone who votes Yes gets a reply. That is the whole funnel.
 ```
 
-Nothing is posted. The user posts it.
+Nothing is posted from here. The user posts it. `/ig-campaign` can post a
+single story frame through the API, but stickers (polls, question boxes,
+links) are added in the app, so interactive stories stay manual.

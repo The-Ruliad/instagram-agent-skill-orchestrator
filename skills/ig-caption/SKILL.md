@@ -116,4 +116,5 @@ search:     "client proposals" in line 3, "agency pricing" in line 5
 linter:     READY
 ```
 
-Nothing is posted. The user pastes it.
+Nothing is posted from here. The user pastes it, or `/ig-campaign` posts it
+with the media after their yes.

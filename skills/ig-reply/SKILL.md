@@ -22,6 +22,11 @@ writes.
 The user pastes the comments, ideally with handles. Screenshots are fine. Do
 not scrape the thread with a browser tool.
 
+If the account is connected through `/ig-campaign`, pull the thread from
+Instagram's own API instead: `python3 ../ig-campaign/igapi.py comments <media id>`
+(`igapi.py media` lists the ids). That is the official API, not scraping. The
+replies are still posted by the user.
+
 ## Triage first
 
 Sort every comment into one of six buckets and say the counts out loud:

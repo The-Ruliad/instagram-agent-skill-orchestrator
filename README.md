@@ -1,5 +1,25 @@
 # The Instagram agent skill
 
+> **The Ruliad fork.** Upstream is
+> [Jakeschincariol/instagram-agent-skill](https://github.com/Jakeschincariol/instagram-agent-skill);
+> everything below this box is its README with paths changed. This fork adds
+> what an agency needs to run campaigns for clients inside TR_OS:
+>
+> - **`/ig-campaign`**, the orchestrator: brief, baseline, plan, the ig-* skills
+>   for the words, Higgsfield for images and video, the humanizer, a review
+>   sheet, then posting and live insights. Its `igapi.py` is the only code
+>   that talks to Instagram, through Meta's official Instagram API with
+>   Instagram Login: a dry run by default, `--confirm` to post, and in TR_OS
+>   a deploy-class gate on every confirmed post.
+> - **`/seo-geo`**: what search engines and AI answer engines can read about a
+>   client's website, scored, with the search terms that feed the captions.
+> - **One folder per client**: `marketing/instagram/` at the root of the
+>   client's project instead of one global `~/.claude/instagram/`, with the
+>   access token in a git-ignored `.secrets/`.
+>
+> Install into TR_OS with `bash tros/install.sh` (see [tros/README.md](tros/README.md)).
+> Tests: `python3 -m unittest discover -s tests`.
+
 Thirteen Claude skills that run an Instagram account. Free, MIT, no signup, no
 API key, nothing to connect.
 
@@ -47,7 +67,7 @@ of a chat and it runs as a mode. You lose the five Python tools, which is most
 of the point of `/ig-reel` and `/ig-human`, but the rest works.
 
 Then spend ten minutes on `templates/voice.md`. Copy it to
-`~/.claude/instagram/voice.md` and fill it in, or send Claude three of your own
+`marketing/instagram/voice.md` and fill it in, or send Claude three of your own
 reels and say "write my voice.md from these". Every skill reads that file. It
 matters more here than on other platforms, because you have to say the words
 out loud.
@@ -199,7 +219,7 @@ After `humanize.py`, with the flagged structures still unrewritten:
 ### The swipe file
 
 ```bash
-python3 swipe.py captured.tsv --out ~/.claude/instagram/swipe.md
+python3 swipe.py captured.tsv --out marketing/instagram/swipe.md
 ```
 
 Raw views are not evidence. A 2,000,000-follower account doing 400,000 views
@@ -279,6 +299,16 @@ accounts action-blocked. So every skill here ends the same way: a copy-ready
 block, and you post it. That is not a limitation bolted on afterwards, it is
 the design, and it is why the approval gate is real rather than a setting.
 
+**In this fork, one skill does post, through that API and nothing else.**
+`/ig-campaign` uses the Instagram API with Instagram Login, which since 2024 no
+longer needs a linked Facebook Page, and needs no app review for accounts you
+manage and have added to your own app. A post goes out only as a separate
+`igapi.py publish ... --confirm` command after the user has seen the dry run
+and said yes, and under TR_OS that command waits on the operator's approval
+like a production deploy. Everything above still holds for the other twelve
+skills: they write, and nothing in this repo automates a browser, scrapes,
+follows, likes, comments or DMs.
+
 The one exception is keyword auto-replies in DMs, which Instagram supports
 through its own tools and approved partners, and which only fire after somebody
 comments first. `/ig-dm` says where that line is.
@@ -324,11 +354,21 @@ skills/ig-human/detect.py          the five-check panel
 skills/ig-viral/swipe.py           outlier ranking and formula classification
 skills/ig-profile/rubric.json      the 100-point profile score
 templates/voice.md                 your voice profile. Fill this in first.
+
+skills/ig-campaign/igapi.py        Ruliad fork: the Instagram API (profile, media, insights,
+                                   comments, quota, publish behind --confirm, token refresh)
+skills/ig-campaign/templates/      the client voice.md that `igapi.py init` copies
+skills/seo-geo/seogeo.py           Ruliad fork: the SEO/GEO baseline of a website
+tests/                             offline tests for both, against a fake Instagram
+tros/                              the TR_OS installer, its reviewed manifest and SOURCE.txt
 ```
 
 ## Credit
 
 Made by Jake Schincariol, [opusjake.ai](https://opusjake.ai).
+
+Fork by The Ruliad BV ([theruliad.eu](https://theruliad.eu)): `/ig-campaign`,
+`igapi.py`, `/seo-geo`, the per-client folder and the TR_OS installer.
 
 Sibling repo, same idea for a different platform:
 [linkedin-agent-skill](https://github.com/Jakeschincariol/linkedin-agent-skill).

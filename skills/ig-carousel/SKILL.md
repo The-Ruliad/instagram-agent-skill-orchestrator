@@ -100,4 +100,5 @@ CAROUSEL  ·  8 slides
 Caption: Job B, hook in line 1, one ask, 3 tags.
 ```
 
-Nothing is uploaded. The user posts it.
+Nothing is uploaded from here. The user posts it, or `/ig-campaign` does after
+their yes. The API takes JPEG only, so export the slides as 1080x1350 JPEGs.

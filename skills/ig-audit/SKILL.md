@@ -16,7 +16,17 @@ The user's own last 30 posts are the evidence.
 
 ## Input
 
-Ask for whichever the user has:
+If the account is connected through `/ig-campaign`, do not ask for screenshots
+of what the API already knows. Run
+`python3 ../ig-campaign/igapi.py audit --limit 30`: it writes
+`marketing/instagram/insights/audit-<date>.json` with views, reach, likes,
+comments, shares, saves and follows per post, the account's median views and
+each post's outlier multiple, all computed the way this skill computes them.
+The API does not have the retention graph, hold at 3 seconds or the
+non-follower share of a single post, so still ask for those screenshots for the
+best and worst reels.
+
+Otherwise, ask for whichever the user has:
 
 - Insights per post: views, reach, interactions, watch time, saves, shares,
   follows, and the non-follower share of reach. Screenshots are fine.
@@ -24,7 +34,7 @@ Ask for whichever the user has:
   screenshot is worth more than the rest combined.
 - Or just the posts and their view counts, which is enough for a first pass.
 
-Also read `~/.claude/instagram/log.md` if it exists, since it records which
+Also read `marketing/instagram/log.md` if it exists, since it records which
 hook formula each post used.
 
 ## What to actually measure
